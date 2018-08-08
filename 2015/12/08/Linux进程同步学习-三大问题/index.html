@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+
+
+  <html class="light page-post">
+
+
+<head>
+  <meta charset="utf-8">
+  
+  <title>Linux进程同步学习-三大问题 | Hexo</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  
+    <meta name="keywords" content="Linux," />
+  
+
+  <meta name="description" content="Linux中的进程调度，以大三问题最为凸显，分别为生产者消费者问题，读写问题，哲学家就餐问题。">
+<meta name="keywords" content="Linux">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Linux进程同步学习-三大问题">
+<meta property="og:url" content="http://yoursite.com/2015/12/08/Linux进程同步学习-三大问题/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="Linux中的进程调度，以大三问题最为凸显，分别为生产者消费者问题，读写问题，哲学家就餐问题。">
+<meta property="og:locale" content="default">
+<meta property="og:updated_time" content="2017-04-04T07:24:37.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Linux进程同步学习-三大问题">
+<meta name="twitter:description" content="Linux中的进程调度，以大三问题最为凸显，分别为生产者消费者问题，读写问题，哲学家就餐问题。">
+
+  
+
+  
+    <link rel="icon" href="/favicon.ico">
+  
+
+  <link href="/css/styles.css?v=c114cben" rel="stylesheet">
+
+
+  
+    <link rel="stylesheet" href="/css/personal-style.css">
+  
+
+  
+
+  
+
+  
+
+
+  
+    <script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <link rel="stylesheet" href="//cdn.bootcss.com/font-awesome/4.3.0/css/font-awesome.min.css">
+  
+
+</head>
+
+<body>
+
+
+  
+    <span id="toolbox-mobile" class="toolbox-mobile">盒子</span>
+  
+
+  <div class="post-header CENTER">
+   
+  <div class="toolbox">
+    <a class="toolbox-entry" href="/">
+      <span class="toolbox-entry-text">盒子</span>
+      <i class="icon-angle-down"></i>
+      <i class="icon-home"></i>
+    </a>
+    <ul class="list-toolbox">
+      
+        <li class="item-toolbox">
+          <a
+            class="CIRCLE"
+            href="/archives/"
+            rel="noopener noreferrer"
+            target="_self"
+            >
+            博客
+          </a>
+        </li>
+      
+        <li class="item-toolbox">
+          <a
+            class="CIRCLE"
+            href="/category/"
+            rel="noopener noreferrer"
+            target="_self"
+            >
+            分类
+          </a>
+        </li>
+      
+        <li class="item-toolbox">
+          <a
+            class="CIRCLE"
+            href="/tag/"
+            rel="noopener noreferrer"
+            target="_self"
+            >
+            标签
+          </a>
+        </li>
+      
+        <li class="item-toolbox">
+          <a
+            class="CIRCLE"
+            href="/link/"
+            rel="noopener noreferrer"
+            target="_self"
+            >
+            友链
+          </a>
+        </li>
+      
+        <li class="item-toolbox">
+          <a
+            class="CIRCLE"
+            href="/about/"
+            rel="noopener noreferrer"
+            target="_self"
+            >
+            关于
+          </a>
+        </li>
+      
+        <li class="item-toolbox">
+          <a
+            class="CIRCLE"
+            href="/atom.xml"
+            rel="noopener noreferrer"
+            target="_blank"
+            >
+            RSS
+          </a>
+        </li>
+      
+        <li class="item-toolbox">
+          <a
+            class="CIRCLE"
+            href="/search/"
+            rel="noopener noreferrer"
+            target="_self"
+            >
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  </div>
+
+
+</div>
+
+
+  <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#生产者消费者问题"><span class="toc-text">生产者消费者问题</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#读者写者问题"><span class="toc-text">读者写者问题</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#如何实现线程正在读-写"><span class="toc-text">如何实现线程正在读/写</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#子线程传值问题"><span class="toc-text">子线程传值问题</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#传入一个值"><span class="toc-text">传入一个值</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#传入多个值"><span class="toc-text">传入多个值</span></a></li></ol></li><li class="toc-item toc-level-3"><a class="toc-link" href="#主线程运行中重复访问传入参数的地址"><span class="toc-text">主线程运行中重复访问传入参数的地址</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#实例"><span class="toc-text">实例</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#哲学家就餐问题"><span class="toc-text">哲学家就餐问题</span></a></li></ol>
+  </div>
+
+
+
+<div class="content content-post CENTER">
+   <article id="post-Linux进程同步学习-三大问题" class="article article-type-post" itemprop="blogPost">
+  <header class="article-header">
+    <h1 class="post-title">Linux进程同步学习-三大问题</h1>
+
+    <div class="article-meta">
+      <span>
+        <i class="icon-calendar"></i>
+        <span>2015.12.08</span>
+      </span>
+
+      
+        <span class="article-author">
+          <i class="icon-user"></i>
+          <span>John Doe</span>
+        </span>
+      
+
+      
+  <span class="article-category">
+    <i class="icon-list"></i>
+    <a class="article-category-link" href="/categories/Linux/">Linux</a>
+  </span>
+
+
+
+      
+
+      
+      <i class="fa fa-eye"></i> 
+        <span id="busuanzi_container_page_pv">
+           &nbsp热度 <span id="busuanzi_value_page_pv">
+           <i class="fa fa-spinner fa-spin"></i></span>℃
+        </span>
+      
+      
+    </div>
+  </header>
+
+  <div class="article-content">
+    
+      <p>　　Linux中的进程调度，以大三问题最为凸显，分别为生产者消费者问题，读写问题，哲学家就餐问题。<br><a id="more"></a></p>
+<h2 id="生产者消费者问题"><a href="#生产者消费者问题" class="headerlink" title="生产者消费者问题"></a>生产者消费者问题</h2><p>　　这个问题作为操作系统课上最经典的问题，可能每年都要被大陆成千上万的大学教师提及无数次。因为总是有那么一群生产工人和消费小队无休无止的从一个仓库里拿东西放东西，放东西拿东西，而且每次都还不看看是不是还有没有东西。</p>
+<p>　　解决这个问题，只需要让他们注意仓库已经空/满即可，并不需要更多的操作。以下代码可以轻易的解决这个问题，借用自Parter之手的代码：</p>
+<pre>
+<code>
+#include < stdio.h >  
+#include < pthread.h >     //线程  
+#include < semaphore.h >    //因为用到了sem_init等  
+#include < unistd.h >  
+#include < stdlib.h >  
+#include < time.h >  
+
+int buffer[10]={0,0,0,0,0,0,0,0,0,0};  
+int i=0;  
+int j=0;  
+//信号量的数据类型为结构sem_t，它本质上是一个长整型的数  
+sem_t full;//信号量   
+sem_t empty;  
+pthread_mutex_t mutex;//pthread_mutex_t是一个结构,是互斥锁  
+
+
+void producer(void)  
+{   
+  int m;  
+  while(i < 10)  
+  {  
+   pthread_mutex_lock(&mutex);//声明开始用互斥锁上锁  
+   buffer[i]=i+1;  
+   i=i+1;  
+   printf("\nthere are 10 blocks in the buffer:\n");  
+   printf("\nbuffer:");  
+   for(m=0;m < 10;m++)  
+      printf("% 3d",buffer[m]);  
+   printf("\n the number added by the producer is:");  
+   printf("%d ", buffer[i]);  
+   printf("\ npointer is %d",i);  
+   sem_post(&full);
+   //sem_post函数的作用是给信号量的值加上一个“1”，它是一个“原子操作"即同时对同一个信号量做加“1”操作的两个线程是不会冲突的  
+   pthread_mutex_unlock(&mutex);//声明开始用互斥锁解锁  
+  }  
+}  
+
+void consumer(void)  
+{   
+  int m;  
+  while(j < 10)  
+  {  
+   int x;  
+   pthread_mutex_lock(&mutex);  
+   sem_wait(&full);
+   // sem_wait函数也是一个原子操作，它的作用是从信号量的值减去一个“1”，但它永远会先等待该信号量为一个非零值才开始做减法。  
+   if(buffer[j]==0)  
+     break;  
+   x=buffer[j];  
+   buffer[j]=0;  
+   j=j+1;  
+   printf("\ nbuffer:");  
+   for(m=0;m < 10;m++)  
+     printf("% 3d",buffer[m]);  
+   printf("\n %d is removed form the buffer by consumer",x);  
+   printf("\n The present pointer is %d",j);  
+   pthread_mutex_unlock(&mutex);  
+   sem_post(& empty);  
+  }  
+}  
+
+
+int main()  
+{  
+  pthread_t thread1,thread2,thread3,thread4;  
+  sem_init(&full,0,0);
+  //int sem_init(sem_t *sem, int pshared, unsigned int value)---------sem_init() 初始化一个定位在 sem 的匿名信号量。value 参数指定信号量的初始值。
+  //pshared 参数指明信号量是由进程内线程共享，还是由进程之间共享。如果 pshared 的值为 0，那么信号量将被进程内的线程共享，并且应该放置在所有线程都可见的地址上  
+  sem_init(& empty,0,10);  
+  pthread_create(&thread1,NULL,(void *)producer,NULL);//函数pthread_create用来创建一个线程  
+  pthread_create(&thread2,NULL,(void *)consumer,NULL);//函数pthread_join用来等待一个线程的结束  
+  pthread_join(thread1,NULL);  
+  pthread_join(thread2,NULL);  
+}
+</code>
+</pre>
+
+<h2 id="读者写者问题"><a href="#读者写者问题" class="headerlink" title="读者写者问题"></a>读者写者问题</h2><p>　　这个问题是困扰我最久的一个问题，因为这个问题需要模拟CPU实时解析读写请求，重在模拟二字在厨时实在难以实现，造成了很多问题，故此篇幅也将记录我在这个问题下曾遇到的所有的陷阱。</p>
+<h3 id="如何实现线程正在读-写"><a href="#如何实现线程正在读-写" class="headerlink" title="如何实现线程正在读/写"></a>如何实现线程正在读/写</h3><p>　　错误的做法是使用while()循环来判断时间是否到达某指定时间点，这样做会导致无法做到等待，而是直接执行完，原因尚且不明。可行的办法是使用sleep()或者是usleep()函数来让线程强制睡眠/让出CPU时间，等时间到了，再同时抢夺CPU时间片来执行。</p>
+<h3 id="子线程传值问题"><a href="#子线程传值问题" class="headerlink" title="子线程传值问题"></a>子线程传值问题</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">int pthread_create(pthread_t *tidp, const pthread_attr_t *attr, (void*)(*start_rtn)(void*),void *arg);</span><br></pre></td></tr></table></figure>
+<p>　　使用pthread_join()函数可以给子线程传值，第四个参数便是传入的参数是一个void*类型的指针。</p>
+<p>　　<strong>问题：</strong>如果传值的时候没有严格按照指针类型来传值，可能会出现Segment Fault(core dumped)的错误，这原是访问超界的问题，但是不清楚为什么会在这里出现。</p>
+<h4 id="传入一个值"><a href="#传入一个值" class="headerlink" title="传入一个值"></a>传入一个值</h4><p>　　使用pthread_create()传一个值，分为两种情况：传指针和传值。</p>
+<p>　　当创建线程的时候如果创建线程的函数会用jion等待子线程的时候，可以用指针传参，这时候主线程函数的所有内容还存在，获取该地址的内容也不会出错。但是如果不需要等待子线程结束而直接向下运行的时候，传参就有可能出现问题，就是创建线程的函数执行完成后，其所占的空间会被释放而值被改变，而创建的线程此时会根据参数地址去取其值，但是此空间已经被改变，所以再取内容会出错。</p>
+<p><strong>传指针：</strong></p>
+<pre>
+<code>
+int main()
+{
+    int i=0;
+    int num = 0;
+    while(i < 100)
+    {
+        i++;
+        if(i==5)
+        {
+            add_fun(i);
+        }
+    }
+}
+void add_fun(int k)
+{
+    pthread_t pid;
+    pthread_create(&pid, NULL, addtion, (void *)&k);
+}
+void *addtion(void *ii)
+{
+    int *dd = (int *)ii;
+    printf("i is %d\n", *dd);
+}
+</code>
+</pre>
+
+<p>　　上面一段函数传入了整数K的指针，但是这个方式有一定的局限性。</p>
+<p>　　此时，创建线程的时候，会将add_fun函数中k的地址传给线程，此时ii获取的是k的地址，然后赋给dd，此时add_fun函数已经执行完，其中k的值可能已经被改变，此时ii是获取的k的地址，所以打印其值就不是之前传进去的5了，所以会发生实际值和自己想的不一样，但是在add_fun函数中加一个pthread_jion();函数就可以一直等这不会执行完。</p>
+<p><strong>传值：</strong></p>
+<pre>
+<code>
+int main()
+{
+    int i=0;
+    int num = 0;
+    while(i < 100)
+    {
+        i++;
+        if(i==5)
+        {
+            add_fun(i);
+        }
+    }
+}
+void add_fun(int k)
+{
+    pthread_t pid;
+    pthread_create(&pid, NULL, addtion, (void *)k);//@
+}
+void *addtion(void *ii)
+{
+    int *dd = (int )ii;//@
+    printf("i is %d\n", *dd);
+}
+</code>
+</pre>
+
+<p>　　上面的函数使用了传值的方式，将K的值直接用void * 强制转化传入，在子线程中也只是需要用int强制转化，也不会出现访问的值变化的问题。</p>
+<p>参考：<a href="http://blog.chinaunix.net/uid-20798022-id-117209.html" target="_blank" rel="noopener">linux下线程传参问题</a></p>
+<h4 id="传入多个值"><a href="#传入多个值" class="headerlink" title="传入多个值"></a>传入多个值</h4><p>　　给子线程传入多个值通常有两种办法：使用结构体或者是void数组。</p>
+<p><strong>结构体：</strong></p>
+<pre>
+<code>
+struct argument
+{
+    int num;
+    char string[30];
+};
+int main()
+{
+    struct argument arg;
+
+    //参数结构体值初始化
+    arg1.num = 18;
+    strcpy(arg1.string, "你好" );
+
+    //传入arg的地址，并进行强制转化。
+    pthread_create(&thread1, NULL, thread1_func, (void*）&arg);
+}
+void *thread1_func( void *arg )
+{
+    //接收传递过来的参数结构体
+    struct argument *arg_thread;
+
+    //将指针强制转化
+    arg_thread1 = ( struct argument * )arg;
+｝
+</code>
+</pre>
+
+<p><strong>void数组传值：</strong></p>
+<pre>
+<code>
+void*   route(void*   args)   
+{   
+    //注意这里，是void**，而不是void* 
+    int*   iptr   =   ((void**)args)[0];
+    float*   fptr   =   ((void**)args)[1];   
+    char*   str   =   ((void**)args)[2];   
+    printf("integer:   %d/nfloat:   %f/nstring:   %s/n",   *iptr,   *fptr,   str);   
+    return   0;   
+}   
+​    
+int   main(void)   
+{   
+    pthread_t   thr_id;   
+    int   ival   =   1;   
+    float   fval   =   10.0F;   
+    char   buf[]   =   "func";   
+    void*   arg[3]={&ival,   &fval,   buf};          //void指针数组
+    pthread_create(&thr_id,   NULL,   route,   arg);   
+    sleep(1);  
+    return 0; 
+}
+</code>
+</pre>
+
+<p>　　和第一种方法的不同之处在于args是一个void指针，但是我们要把它当作二级指针用。void指针是可以指向任何地址的，args其实是指向那个arg[]数组的，我们知道数组其实就是一个指针，所以args是指针的指针。</p>
+<p>　　但是void指针是不能解引用的，它不代表真实的变量，因为真实的变量还有变量大小，对应的指针能根据变量大小来加减，void* 是没有的，也就不能做算法操作。</p>
+<p>　　所以代码中为了支持下标操作，把void* 转换成void**。</p>
+<p>　　不是说了void* 是没有类型的么，为啥void**能支持下标操作？</p>
+<p>　　void<em>  是说: 这是一个指针,它指向的对象未知。<br><br>　　void**  是说: 这是一个指针,它指向一个void</em> 型的数据结构.void*是一个指针，指针长度是已知的，所以也就可以支持下标操作了。</p>
+<p>参考：<a href="http://www.kryptosx.info/archives/737.html" target="_blank" rel="noopener">初探linux pthread多线程编程</a></p>
+<h3 id="主线程运行中重复访问传入参数的地址"><a href="#主线程运行中重复访问传入参数的地址" class="headerlink" title="主线程运行中重复访问传入参数的地址"></a>主线程运行中重复访问传入参数的地址</h3><p>　　这个问题是基于传入地址的传参数做法的，主要表现为我访问传入的参数，前两次还是正确的值，但跑着跑着，值变得越来越奇怪，源于主线程修改了之前传入参数地址指向的地址或者是指向的地址的内容(即本文中传一个值时介绍的问题)。</p>
+<p><strong>解决方案:</strong>在子线程中第一次访问传入参数的时候，便定义一个变量来将指针指向的内容赋值给他。这样之后运行的时候，即便指针指向的内容变化，也不会妨碍你之前拥有的值。</p>
+<h3 id="实例"><a href="#实例" class="headerlink" title="实例"></a>实例</h3><pre>
+<code>
+//代码稍显繁乱，无力再次修改
+#include < stdio.h>
+#include < stdlib.h>
+#include < semaphore.h>
+#include < unistd.h>
+#include < pthread.h>
+#define MAX_PROCESS_NUM 50
+#define MAX_TIME 50
+int visited[MAX_TIME]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+int readers = 0;
+int counter = 0;
+int processNum = 0;
+int curTime = 0;
+int crttime;
+void readfile();
+struct process
+{
+    double serial_num;
+    char mission;
+    double start_time;
+    double time;
+    int runned;
+};
+struct process* pList[MAX_PROCESS_NUM];
+void readProcess()
+{
+    FILE* fin;
+    fin = fopen("input.txt", "r");
+    if (fin == NULL)
+    {
+        fprintf(stderr, "file open errored!\n");
+        exit(0);
+    }
+    int i = 0;
+
+    while (!feof(fin))
+    {
+        pList[i] = (struct process*)malloc(sizeof(struct process));
+        fscanf(fin, "%lf", &pList[i]->serial_num);
+        fscanf(fin, " %c", &pList[i]->mission);
+        fscanf(fin, " %lf", &pList[i]->start_time);
+        fscanf(fin, " %lf\n", &pList[i]->time);
+        pList[i]->runned = 0;
+        ++i;
+    }
+    fclose(fin);
+    processNum = i;
+    printf("serial_num\tmission\t\tstart_time\ttime\n");
+    for (int j = 0; j < i; ++j)
+    {
+        printf("%f\t\t", pList[j]->serial_num);
+        printf("%c\t\t", pList[j]->mission);
+        printf("%f\t\t", pList[j]->start_time);
+        printf("%f\t\n", pList[j]->time);
+    }
+
+    //sort
+    struct process * temp;
+    for (int i = 0; i < processNum - 1; i++)
+    {
+        for (int j = i + 1; j < processNum; j++)
+        {
+            if (pList[i]->start_time > pList[j]->start_time)
+            {
+                temp = pList[i];
+                pList[i] = pList[j];
+                pList[j] = temp;
+            }
+        }
+    }
+    printf("serial_num\tmission\t\tstart_time\ttime\n");
+    for (int j = 0; j < i; ++j)
+    {
+        printf("%f\t\t", pList[j]->serial_num);
+        printf("%c\t\t", pList[j]->mission);
+        printf("%f\t\t", pList[j]->start_time);
+        printf("%f\t\n", pList[j]->time);
+    }
+    return;
+}
+
+
+//define sem
+sem_t sem;
+//define mutex
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+void *reader(void *param);
+void *writer(void *param);
+//define
+void *reader(void *param)
+{
+    int total = 5;
+    int val=0;
+    int*v  = ((void**)param)[0];
+    int i=*v;
+    int* t = ((void**)param)[2];
+    int end_time =*t;
+    int* pass_time = ((void**)param)[1];
+    int wait_time=(end_time-*pass_time);
+    if(visited[*pass_time]==0)
+    {
+        printf("current time:%d\n", *pass_time);
+        visited[*pass_time]=1;
+    }
+    int cr1=crttime;
+    printf("\t\tthe reader%d is applying for reading data\n", i);
+    sem_wait(&sem);
+    sem_getvalue(&sem, &val);
+
+    if(val == 5)
+        pthread_mutex_lock(&mutex);
+
+    int cr2 = crttime;
+    fflush(stdout);
+    printf("\t\tthe reader%d is reading...\n", i);
+
+    sleep(wait_time);
+
+    if(visited[end_time] == 0)
+    {
+        fflush(stdout);
+        printf("current time:%d\n",end_time+cr2-cr1);
+        visited[end_time]=1;
+    }
+
+    fflush(stdout);
+    printf("\t\tthe reader%d finished reading the data\n", i);
+
+    sem_post(&sem);
+    sem_getvalue(&sem, &val);
+
+    if(val == 6)
+        pthread_mutex_unlock(&mutex);
+
+    pthread_exit(0);
+}
+
+void *writer(void *param)
+{
+
+    int*v  = ((void**)param)[0];
+    int i=*v;
+    int* t = ((void**)param)[2];
+    int end_time =*t;
+
+    int* pass_time = ((void**)param)[1];
+    int wait_time=(end_time-*pass_time);
+    if(visited[*pass_time] == 0)
+    {
+        printf("current time:%d\n", *pass_time);
+        visited[*pass_time]=1;
+    }
+    fflush(stdout);
+        int cr1 = crttime;
+    printf("\t\tthe writer%d is applying to writting the data\n", i);
+
+    pthread_mutex_lock(&mutex);
+        int cr2 = crttime;
+    fflush(stdout);
+    printf("\t\tthe writer%d is writting...\n", i);
+
+    //wait
+    sleep(wait_time);
+
+
+    if(visited[end_time] == 0)
+    {
+        fflush(stdout);
+        printf("current time:%d\n",end_time+cr2-cr1e);
+        visited[end_time]=1;
+    }
+
+
+    fflush(stdout);
+    printf("\t\tthe writer%d finished reading the data\n", i);
+
+    pthread_mutex_unlock(&mutex);
+
+
+    pthread_exit(0);
+}
+
+int main(int argc, char *argv[])
+{
+    //declare the thread
+    pthread_t tid[2];
+    pthread_attr_t attr[2];
+
+    pthread_attr_init(&attr[0]);
+    pthread_attr_init(&attr[1]);
+
+    //init
+    pthread_mutex_init(&mutex, NULL);
+    sem_init(&sem, 0, 6);
+
+    readProcess();
+
+    double end=0;
+    //find_the_last_time
+    for(int i=0;i<processnum;++i) if(plist[i]-="">start_time+pList[i]->time>end)
+            end = pList[i]->start_time+pList[i]->time;
+    double complete_time = 0;
+    for(int i=0; i<end; i++)="" {="" if(i<processnum)="" crttime="i;" int="" end_time="pList[i]-">start_time + pList[crttime]->time;
+        int pass_time = pList[i]->start_time;
+    //TODO 
+    //segement fault (core dumped)
+    void* arg[3]={&i, &pass_time, &end_time};
+    if(pList[i]->mission == 'R')
+        pthread_create(&tid[0],&attr[0],reader, arg);
+    else
+        pthread_create(&tid[1],&attr[1],writer, arg);
+    //TODO
+
+    }
+
+    sleep(1);
+    ++crttime;
+    }
+
+    //MUTEX
+    pthread_mutex_destroy(&mutex);
+    for(int i = 0;i < 12; ++i)
+    {
+    sleep(11);
+    ++crttime;
+    }
+    printf ("completed\n");
+
+    return 0;
+}
+</end;></processnum;++i)></code>
+</pre>
+
+<h2 id="哲学家就餐问题"><a href="#哲学家就餐问题" class="headerlink" title="哲学家就餐问题"></a>哲学家就餐问题</h2><p>　　哲学家就餐问题，有多种解决方案：<br></p>
+<ol>
+<li>奇数号哲学家先拿他左边的筷子，偶数号哲学家先拿他右边的筷子。这样破坏了同方向环路，一个哲学家拿到一只筷子后，就阻止了他邻座的一个哲学家吃饭。按此规定，将是1、2号哲学家竞争I号筷子；3、4号哲学家竞争4号筷子。<br></li>
+<li>至多允许四位哲学家进餐，将最后一个哲学家停止申请资源，断开环路。最终能保证有一位哲学家能进餐，用完释放两只筷子，从而使更多的哲学家能够进餐。<br></li>
+<li>哲学家申请资源总是按照资源序号先大后小的顺序，这样0．3号哲学家先右后左，但是4号哲学家先左后右，改变方向，破坏了环路。</li>
+</ol>
+<p>　　以上做法都是资源分级解法。另还有通过第三方判断等等算法。</p>
+<p><strong>实例：</strong></p>
+<pre>
+<code>
+//简易模拟，参考部分网上资源，采用资源分级解法中的第一种解法。
+#include < stdio.h>
+#include < stdlib.h>
+#include < unistd.h>
+#include < pthread.h>
+#include < semaphore.h>
+#include < string.h>
+
+#define PEOPLE_NUM 4
+#define THINKING 1
+#define HUNGRY 2
+#define EATING 3
+
+sem_t chopsticks[PEOPLE_NUM];
+pthread_mutex_t mutex;
+void *philosopher(void *arg);
+void *philosopher(void *arg)
+{
+    int* pid = (int*)arg;
+    int id = *pid;
+    int state = THINKING;
+    while(1)
+    {
+        switch(state){
+            case THINKING:
+            {  
+                printf("philosopher%d is thinking\n",id);
+                sleep(3);
+                state=EATING;
+            }
+            break;
+            case EATING:
+            {
+                int tmp = (id+1)%PEOPLE_NUM;
+                if(id == 0||id == 2)
+                {
+                sem_wait(&chopsticks[id]);
+                sem_wait(&chopsticks[tmp]);
+                printf("philosopher%d is eating\n",id);
+                sleep(1);
+
+                sem_post(&chopsticks[tmp]);
+                sem_post(&chopsticks[id]);
+                }
+                else
+                {
+                sem_wait(&chopsticks[tmp]);
+                sem_wait(&chopsticks[id]);
+                printf("philosopher%d is eating\n",id);
+                sleep(1);
+
+                sem_post(&chopsticks[id]);
+                sem_post(&chopsticks[tmp]);
+                }
+                state = THINKING;
+            }
+            break;
+        }
+
+    }
+}
+
+int main(){
+    pthread_t tid[PEOPLE_NUM];
+    for(i = 0 ; i < PEOPLE_NUM ; i ++){
+        sem_init(&chopsticks[i],0,1);
+    }
+
+    int people[PEOPLE_NUM]={0,1,2,3};
+    for(i=0; i < PEOPLE_NUM ;i++)
+    pthread_create(&tid[0],NULL,philosopher,(void*)&people[i]);
+    pthread_join(tid[0],NULL);
+    return 0;
+}
+</code>
+</pre>
+
+    
+  </div>
+
+</article>
+
+
+   
+  <div class="text-center donation">
+    <div class="inner-donation">
+      <span class="btn-donation">支持一下</span>
+      <div class="donation-body">
+        <div class="tip text-center">扫一扫，支持forsigner</div>
+        <ul>
+        
+          <li class="item">
+            
+              <span>微信扫一扫</span>
+            
+            <img src="/images/qr-wechat.png" alt="">
+          </li>
+        
+          <li class="item">
+            
+              <span>支付宝扫一扫</span>
+            
+            <img src="/images/qr-alipay.png" alt="">
+          </li>
+        
+        </ul>
+      </div>
+    </div>
+  </div>
+
+
+   
+  <div class="box-prev-next clearfix">
+    <a class="show pull-left" href="/2015/12/06/理想的后花园-《怦然心动》/">
+        <i class="icon icon-angle-left"></i>
+    </a>
+    <a class="show pull-right" href="/2015/12/09/数据结构-图论/">
+        <i class="icon icon-angle-right"></i>
+    </a>
+  </div>
+
+
+
+
+
+   
+      <div class="git"></div>
+   
+</div>
+
+
+  <a id="backTop" class="back-top">
+    <i class="icon-angle-up"></i>
+  </a>
+
+
+
+
+  <div class="modal" id="modal">
+  <span id="cover" class="cover hide"></span>
+  <div id="modal-dialog" class="modal-dialog hide-dialog">
+    <div class="modal-header">
+      <span id="close" class="btn-close">关闭</span>
+    </div>
+    <hr>
+    <div class="modal-body">
+      <ul class="list-toolbox">
+        
+          <li class="item-toolbox">
+            <a
+              class="CIRCLE"
+              href="/archives/"
+              rel="noopener noreferrer"
+              target="_self"
+              >
+              博客
+            </a>
+          </li>
+        
+          <li class="item-toolbox">
+            <a
+              class="CIRCLE"
+              href="/category/"
+              rel="noopener noreferrer"
+              target="_self"
+              >
+              分类
+            </a>
+          </li>
+        
+          <li class="item-toolbox">
+            <a
+              class="CIRCLE"
+              href="/tag/"
+              rel="noopener noreferrer"
+              target="_self"
+              >
+              标签
+            </a>
+          </li>
+        
+          <li class="item-toolbox">
+            <a
+              class="CIRCLE"
+              href="/link/"
+              rel="noopener noreferrer"
+              target="_self"
+              >
+              友链
+            </a>
+          </li>
+        
+          <li class="item-toolbox">
+            <a
+              class="CIRCLE"
+              href="/about/"
+              rel="noopener noreferrer"
+              target="_self"
+              >
+              关于
+            </a>
+          </li>
+        
+          <li class="item-toolbox">
+            <a
+              class="CIRCLE"
+              href="/atom.xml"
+              rel="noopener noreferrer"
+              target="_blank"
+              >
+              RSS
+            </a>
+          </li>
+        
+          <li class="item-toolbox">
+            <a
+              class="CIRCLE"
+              href="/search/"
+              rel="noopener noreferrer"
+              target="_self"
+              >
+              搜索
+            </a>
+          </li>
+        
+      </ul>
+
+    </div>
+  </div>
+</div>
+
+
+
+  
+      <div class="fexo-comments comments-post">
+    
+
+    
+
+    
+    
+
+    
+
+    
+    
+
+  </div>
+
+  
+
+  <script type="text/javascript">
+  function loadScript(url, callback) {
+    var script = document.createElement('script')
+    script.type = 'text/javascript';
+
+    if (script.readyState) { //IE
+      script.onreadystatechange = function() {
+        if (script.readyState == 'loaded' ||
+          script.readyState == 'complete') {
+          script.onreadystatechange = null;
+          callback();
+        }
+      };
+    } else { //Others
+      script.onload = function() {
+        callback();
+      };
+    }
+
+    script.src = url;
+    document.getElementsByTagName('head')[0].appendChild(script);
+  }
+
+  window.onload = function() {
+    loadScript('/js/bundle.js?235683', function() {
+      // load success
+    });
+  }
+</script>
+
+</body>
+</html>

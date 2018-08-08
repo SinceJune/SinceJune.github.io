@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+
+
+  <html class="light page-post">
+
+
+<head>
+  <meta charset="utf-8">
+  
+  <title>Git内部原理 | Hexo</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+
+  
+    <meta name="keywords" content="Python Docker" />
+  
+
+  <meta name="description" content="Git is fundamentally a content-addressable filesystem with a VCS user interface written on top of it.  Git是一个分布式的文件版本控制系统，但是他的设计初衷是一个内容可被寻址的文件系统，只是体现出来许多VCS的特征。 relationship between traditional VCS 传">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Git内部原理">
+<meta property="og:url" content="http://yoursite.com/2017/02/11/Git内部原理/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="Git is fundamentally a content-addressable filesystem with a VCS user interface written on top of it.  Git是一个分布式的文件版本控制系统，但是他的设计初衷是一个内容可被寻址的文件系统，只是体现出来许多VCS的特征。 relationship between traditional VCS 传">
+<meta property="og:locale" content="default">
+<meta property="og:updated_time" content="2017-04-03T18:24:04.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Git内部原理">
+<meta name="twitter:description" content="Git is fundamentally a content-addressable filesystem with a VCS user interface written on top of it.  Git是一个分布式的文件版本控制系统，但是他的设计初衷是一个内容可被寻址的文件系统，只是体现出来许多VCS的特征。 relationship between traditional VCS 传">
+
+  
+
+  
+    <link rel="icon" href="/favicon.ico">
+  
+
+  <link href="/css/styles.css?v=c114cben" rel="stylesheet">
+
+
+  
+    <link rel="stylesheet" href="/css/personal-style.css">
+  
+
+  
+
+  
+
+  
+
+
+  
+    <script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+    <link rel="stylesheet" href="//cdn.bootcss.com/font-awesome/4.3.0/css/font-awesome.min.css">
+  
+
+</head>
+
+<body>
+
+
+  
+    <span id="toolbox-mobile" class="toolbox-mobile">盒子</span>
+  
+
+  <div class="post-header CENTER">
+   
+  <div class="toolbox">
+    <a class="toolbox-entry" href="/">
+      <span class="toolbox-entry-text">盒子</span>
+      <i class="icon-angle-down"></i>
+      <i class="icon-home"></i>
+    </a>
+    <ul class="list-toolbox">
+      
+        <li class="item-toolbox">
+          <a
+            class="CIRCLE"
+            href="/archives/"
+            rel="noopener noreferrer"
+            target="_self"
+            >
+            博客
+          </a>
+        </li>
+      
+        <li class="item-toolbox">
+          <a
+            class="CIRCLE"
+            href="/category/"
+            rel="noopener noreferrer"
+            target="_self"
+            >
+            分类
+          </a>
+        </li>
+      
+        <li class="item-toolbox">
+          <a
+            class="CIRCLE"
+            href="/tag/"
+            rel="noopener noreferrer"
+            target="_self"
+            >
+            标签
+          </a>
+        </li>
+      
+        <li class="item-toolbox">
+          <a
+            class="CIRCLE"
+            href="/link/"
+            rel="noopener noreferrer"
+            target="_self"
+            >
+            友链
+          </a>
+        </li>
+      
+        <li class="item-toolbox">
+          <a
+            class="CIRCLE"
+            href="/about/"
+            rel="noopener noreferrer"
+            target="_self"
+            >
+            关于
+          </a>
+        </li>
+      
+        <li class="item-toolbox">
+          <a
+            class="CIRCLE"
+            href="/atom.xml"
+            rel="noopener noreferrer"
+            target="_blank"
+            >
+            RSS
+          </a>
+        </li>
+      
+        <li class="item-toolbox">
+          <a
+            class="CIRCLE"
+            href="/search/"
+            rel="noopener noreferrer"
+            target="_self"
+            >
+            搜索
+          </a>
+        </li>
+      
+    </ul>
+  </div>
+
+
+</div>
+
+
+  <div id="toc" class="toc-article">
+    <strong class="toc-title">文章目录</strong>
+    <ol class="toc"><li class="toc-item toc-level-4"><a class="toc-link" href="#relationship-between-traditional-VCS"><span class="toc-text">relationship between traditional VCS</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#底层命令-Plumbing-和高层命令-Porcelain"><span class="toc-text">底层命令 (Plumbing) 和高层命令 (Porcelain)</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#初始化一份Git需要什么？"><span class="toc-text">初始化一份Git需要什么？</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#添加第一个文件"><span class="toc-text">添加第一个文件</span></a></li></ol>
+  </div>
+
+
+
+<div class="content content-post CENTER">
+   <article id="post-Git内部原理" class="article article-type-post" itemprop="blogPost">
+  <header class="article-header">
+    <h1 class="post-title">Git内部原理</h1>
+
+    <div class="article-meta">
+      <span>
+        <i class="icon-calendar"></i>
+        <span>2017.02.11</span>
+      </span>
+
+      
+        <span class="article-author">
+          <i class="icon-user"></i>
+          <span>John Doe</span>
+        </span>
+      
+
+      
+
+
+      
+
+      
+      <i class="fa fa-eye"></i> 
+        <span id="busuanzi_container_page_pv">
+           &nbsp热度 <span id="busuanzi_value_page_pv">
+           <i class="fa fa-spinner fa-spin"></i></span>℃
+        </span>
+      
+      
+    </div>
+  </header>
+
+  <div class="article-content">
+    
+      <blockquote>
+<p>Git is fundamentally a content-addressable filesystem with a VCS user interface written on top of it.</p>
+</blockquote>
+<p>Git是一个分布式的文件版本控制系统，但是他的设计初衷是一个内容可被寻址的文件系统，只是体现出来许多VCS的特征。</p>
+<h4 id="relationship-between-traditional-VCS"><a href="#relationship-between-traditional-VCS" class="headerlink" title="relationship between traditional VCS"></a>relationship between traditional VCS</h4><ol>
+<li>传统的VCS都是中心化的，如果你的服务端硬盘损坏的话，那么之前的commit记录都会丢失，你从客户端最多只能恢复最后一份commit时文件，而不能恢复所有的commit记录。而Git是一个去中心化的系统，每台机器即可以当服务端也可以当客户端，你可以从任一台机器上恢复所有的记录，因为你在<code>git clone</code>的时候就下载了全部的文件。</li>
+<li>传统VCS的和服务端的操作，例如sync和commit操作，同样在git上也拥有对应的操作，即pull和push，相似的，你需要在push之前使用pull来和某台机器（远程仓库）同步一下。</li>
+<li>Git拥有传统的VCS没有的概念，分支和工作区，暂存区。可以做许多传统VCS不能做的事情。</li>
+</ol>
+<h4 id="底层命令-Plumbing-和高层命令-Porcelain"><a href="#底层命令-Plumbing-和高层命令-Porcelain" class="headerlink" title="底层命令 (Plumbing) 和高层命令 (Porcelain)"></a>底层命令 (Plumbing) 和高层命令 (Porcelain)</h4><p>​    Git区分底层命令和高层命令，高层命令即我们经常使用的pull，push命令，共约30个，底层命令可以从命令行调用，其设计出来主要是为其他工具和自定义脚本调用，并不由用户直接使用，但在下文中，我们会使用一些底层命令来展示Git的内部原理。</p>
+<h4 id="初始化一份Git需要什么？"><a href="#初始化一份Git需要什么？" class="headerlink" title="初始化一份Git需要什么？"></a>初始化一份Git需要什么？</h4><p>​    通过我们会使用<code>git init</code>来创建一个git仓库，<code>git init</code>创建的目录结构如下。</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">➜ tree .git</span><br><span class="line">.git</span><br><span class="line">├── .git/HEAD</span><br><span class="line">├── .git/branches</span><br><span class="line">├── .git/config</span><br><span class="line">├── .git/description</span><br><span class="line">├── .git/hooks</span><br><span class="line">│   ├── .git/hooks/applypatch-msg.sample</span><br><span class="line">│   ├── .git/hooks/commit-msg.sample</span><br><span class="line">│   ├── .git/hooks/post-update.sample</span><br><span class="line">│   ├── .git/hooks/pre-applypatch.sample</span><br><span class="line">│   ├── .git/hooks/pre-commit.sample</span><br><span class="line">│   ├── .git/hooks/pre-push.sample</span><br><span class="line">│   ├── .git/hooks/pre-rebase.sample</span><br><span class="line">│   ├── .git/hooks/pre-receive.sample</span><br><span class="line">│   ├── .git/hooks/prepare-commit-msg.sample</span><br><span class="line">│   └── .git/hooks/update.sample</span><br><span class="line">├── .git/info</span><br><span class="line">│   └── .git/info/exclude</span><br><span class="line">├── .git/objects</span><br><span class="line">│   ├── .git/objects/info</span><br><span class="line">│   └── .git/objects/pack</span><br><span class="line">└── .git/refs</span><br><span class="line">    ├── .git/refs/heads</span><br><span class="line">    └── .git/refs/tags</span><br></pre></td></tr></table></figure>
+<p>​    期中新版本的Git中不再使用branches目录，description目录仅仅在GitWeb中使用，hooks目录中保存了初始化了的钩子函数，也是非必要目录。info目录下的exclude文件可视为全局的.gitignore文件。剩下还有四个重要文件/目录，HEAD，objects/，refs/和还没有生成的index文件。</p>
+<figure class="highlight sh"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">➜ tree .git</span><br><span class="line">.git</span><br><span class="line">├── .git/HEAD （ref: refs/heads/master）</span><br><span class="line">├── .git/objects/</span><br><span class="line">└── .git/refs/</span><br><span class="line"></span><br><span class="line">2 directories, 1 file</span><br><span class="line">➜ git status</span><br><span class="line">On branch master</span><br><span class="line"></span><br><span class="line">Initial commit</span><br><span class="line"></span><br><span class="line">nothing to commit (create/copy files and use <span class="string">"git add"</span> to track)</span><br></pre></td></tr></table></figure>
+<p>​    在文件系统下创建如上所以的文件夹，并将<code>ref: refs/heads/master</code>写入HEAD文件，Git就认为这是一个仓库。这几个文件/文件夹加上index文件是git工作最核心的部分。<code>objects</code> 目录存储所有数据内容，<code>refs</code> 目录存储指向数据 (分支) 的提交对象的指针，<code>HEAD</code> 文件指向当前分支，<code>index</code> 文件保存了暂存区域信息。</p>
+<h4 id="添加第一个文件"><a href="#添加第一个文件" class="headerlink" title="添加第一个文件"></a>添加第一个文件</h4><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">➜  echo "hello world" &gt; hello.txt</span><br><span class="line">➜  git add hello.txt</span><br><span class="line">➜  tree .git</span><br><span class="line">.git</span><br><span class="line">├── .git/HEAD</span><br><span class="line">├── .git/index</span><br><span class="line">├── .git/objects</span><br><span class="line">│   └── .git/objects/3b</span><br><span class="line">│       └── .git/objects/3b/18e512dba79e4c8300dd08aeb37f8e728b8dad</span><br><span class="line">└── .git/refs</span><br></pre></td></tr></table></figure>
+<p>​    创建hello.txt并使用add将其加入缓存区之后，可以看到objects目录下多出了一个3b的目录，3b目录下有18e512dba79e4c8300dd08aeb37f8e728b8dad这个文件。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">➜ echo &apos;hello world&apos; | git hash-object -w --stdin</span><br><span class="line">3b18e512dba79e4c8300dd08aeb37f8e728b8dad</span><br><span class="line">➜ git cat-file -p 3b18e512dba79e4c8300dd08aeb37f8e728b8dad</span><br><span class="line">hello world</span><br></pre></td></tr></table></figure>
+<p>​    可以看出Git把40位的哈希值的前两位用作了目录，后38位用作文件名，这样做有两个好处，一来便于检索，二来可以防止某些系统下对单目录下的文件数量有限制而产生问题。使用<code>cat-file</code>命令可以从hash值取回原本的内容文本。当你接着往该文件中写入一些新内容并再次保存，加入缓存区，这个时候obejcts目录下就会记录两个版本的文件，这就是VCS的雏形。暂存区是在Git控制下的目录。这是objects下管理的第一种类型blob类型。即存储的是文件。</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">➜ echo &quot;hello world&quot; &gt;&gt; hello.txt</span><br><span class="line">➜ git add hello.txt</span><br><span class="line">➜ tree .git</span><br><span class="line">.git</span><br><span class="line">├── .git/HEAD</span><br><span class="line">├── .git/index</span><br><span class="line">├── .git/objects</span><br><span class="line">│   ├── .git/objects/10</span><br><span class="line">│   │   └── .git/objects/10/bda51843e912c86901eea164d0b3f7c9a56df3</span><br><span class="line">│   └── .git/objects/3b</span><br><span class="line">│       └── .git/objects/3b/18e512dba79e4c8300dd08aeb37f8e728b8dad</span><br><span class="line">└── .git/refs</span><br><span class="line">➜ git cat-file -t 3b18e512dba79e4c8300dd08aeb37f8e728b8dad</span><br><span class="line">blob</span><br></pre></td></tr></table></figure>
+<p>​    objects目录下保存另外两种文件是tree和commit，这两种文件只有在commit的时候才会生成，</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br></pre></td><td class="code"><pre><span class="line">➜ mkdir test</span><br><span class="line">➜ echo &quot;hello test&quot; &gt; test/test.txt</span><br><span class="line">➜ git add test/test.txt</span><br><span class="line">➜ tree .git</span><br><span class="line">.git</span><br><span class="line">├── .git/HEAD</span><br><span class="line">├── .git/index</span><br><span class="line">├── .git/objects</span><br><span class="line">│   ├── .git/objects/10</span><br><span class="line">│   │   └── .git/objects/10/bda51843e912c86901eea164d0b3f7c9a56df3</span><br><span class="line">│   ├── .git/objects/3b</span><br><span class="line">│   │   └── .git/objects/3b/18e512dba79e4c8300dd08aeb37f8e728b8dad</span><br><span class="line">│   └── .git/objects/74</span><br><span class="line">│       └── .git/objects/74/8536090c67dbe2ef825e4fcd8f83901215f601</span><br><span class="line">└── .git/refs</span><br><span class="line"></span><br><span class="line">5 directories, 5 files</span><br><span class="line">➜ git commit -m &quot;first commit&quot;</span><br><span class="line">[master (root-commit) 3d66a88] first commit</span><br><span class="line"> 2 files changed, 3 insertions(+)</span><br><span class="line"> create mode 100644 hello.txt</span><br><span class="line"> create mode 100644 test/test.txt</span><br><span class="line">➜ tree .git</span><br><span class="line">.git</span><br><span class="line">├── .git/COMMIT_EDITMSG</span><br><span class="line">├── .git/HEAD</span><br><span class="line">├── .git/index</span><br><span class="line">├── .git/logs</span><br><span class="line">│   ├── .git/logs/HEAD</span><br><span class="line">│   └── .git/logs/refs</span><br><span class="line">│       └── .git/logs/refs/heads</span><br><span class="line">│           └── .git/logs/refs/heads/master</span><br><span class="line">├── .git/objects</span><br><span class="line">│   ├── .git/objects/10</span><br><span class="line">│   │   └── .git/objects/10/bda51843e912c86901eea164d0b3f7c9a56df3</span><br><span class="line">│   ├── .git/objects/2c</span><br><span class="line">│   │   └── .git/objects/2c/42ffe9ab47cb4fb8afd2e5353f1a2a8468e6e9</span><br><span class="line">│   ├── .git/objects/3b</span><br><span class="line">│   │   └── .git/objects/3b/18e512dba79e4c8300dd08aeb37f8e728b8dad</span><br><span class="line">│   ├── .git/objects/3d</span><br><span class="line">│   │   └── .git/objects/3d/66a884dadc577f784a0259ac693e900ae63193</span><br><span class="line">│   ├── .git/objects/74</span><br><span class="line">│   │   └── .git/objects/74/8536090c67dbe2ef825e4fcd8f83901215f601</span><br><span class="line">│   └── .git/objects/7c</span><br><span class="line">│       └── .git/objects/7c/824b3a21d291e689f39d29d3818ce01eb61a34</span><br><span class="line">└── .git/refs</span><br><span class="line">    └── .git/refs/heads</span><br><span class="line">        └── .git/refs/heads/master</span><br><span class="line"></span><br><span class="line">12 directories, 12 files</span><br><span class="line">➜ git cat-file -p 7c82</span><br><span class="line">100644 blob 10bda51843e912c86901eea164d0b3f7c9a56df3	hello.txt</span><br><span class="line">040000 tree 2c42ffe9ab47cb4fb8afd2e5353f1a2a8468e6e9	test</span><br><span class="line">➜ git cat-file -p 2c42f</span><br><span class="line">100644 blob 748536090c67dbe2ef825e4fcd8f83901215f601	test.txt</span><br><span class="line">➜ git cat-file -p 3d66</span><br><span class="line">tree 7c824b3a21d291e689f39d29d3818ce01eb61a34</span><br><span class="line">author xxx &lt;xxx@xx.com&gt; 1486808146 +0800</span><br><span class="line">committer xxx &lt;xxx@xx.com&gt; 1486808146 +0800</span><br><span class="line"></span><br><span class="line">first commit</span><br></pre></td></tr></table></figure>
+<p>在新建test目录，并在该目录下新建一个文件，objects数量就如预计的一样，从两个变成了三个。但是当我们commit的时候。文件一下子从3个变成了6个。多出来的三个就如上图一样，当前目录，test子目录，和commit文件，当你再次更新目录的时候还会有新的tree文件生成。这就是Git的三种object，在object仅存储文件的内容和文件创建的时候无关。</p>
+
+    
+  </div>
+
+</article>
+
+
+   
+  <div class="text-center donation">
+    <div class="inner-donation">
+      <span class="btn-donation">支持一下</span>
+      <div class="donation-body">
+        <div class="tip text-center">扫一扫，支持forsigner</div>
+        <ul>
+        
+          <li class="item">
+            
+              <span>微信扫一扫</span>
+            
+            <img src="/images/qr-wechat.png" alt="">
+          </li>
+        
+          <li class="item">
+            
+              <span>支付宝扫一扫</span>
+            
+            <img src="/images/qr-alipay.png" alt="">
+          </li>
+        
+        </ul>
+      </div>
+    </div>
+  </div>
+
+
+   
+  <div class="box-prev-next clearfix">
+    <a class="show pull-left" href="/2016/05/30/Hint-on-Google/">
+        <i class="icon icon-angle-left"></i>
+    </a>
+    <a class="show pull-right" href="/2017/05/05/Docker Network/">
+        <i class="icon icon-angle-right"></i>
+    </a>
+  </div>
+
+
+
+
+
+   
+      <div class="git"></div>
+   
+</div>
+
+
+  <a id="backTop" class="back-top">
+    <i class="icon-angle-up"></i>
+  </a>
+
+
+
+
+  <div class="modal" id="modal">
+  <span id="cover" class="cover hide"></span>
+  <div id="modal-dialog" class="modal-dialog hide-dialog">
+    <div class="modal-header">
+      <span id="close" class="btn-close">关闭</span>
+    </div>
+    <hr>
+    <div class="modal-body">
+      <ul class="list-toolbox">
+        
+          <li class="item-toolbox">
+            <a
+              class="CIRCLE"
+              href="/archives/"
+              rel="noopener noreferrer"
+              target="_self"
+              >
+              博客
+            </a>
+          </li>
+        
+          <li class="item-toolbox">
+            <a
+              class="CIRCLE"
+              href="/category/"
+              rel="noopener noreferrer"
+              target="_self"
+              >
+              分类
+            </a>
+          </li>
+        
+          <li class="item-toolbox">
+            <a
+              class="CIRCLE"
+              href="/tag/"
+              rel="noopener noreferrer"
+              target="_self"
+              >
+              标签
+            </a>
+          </li>
+        
+          <li class="item-toolbox">
+            <a
+              class="CIRCLE"
+              href="/link/"
+              rel="noopener noreferrer"
+              target="_self"
+              >
+              友链
+            </a>
+          </li>
+        
+          <li class="item-toolbox">
+            <a
+              class="CIRCLE"
+              href="/about/"
+              rel="noopener noreferrer"
+              target="_self"
+              >
+              关于
+            </a>
+          </li>
+        
+          <li class="item-toolbox">
+            <a
+              class="CIRCLE"
+              href="/atom.xml"
+              rel="noopener noreferrer"
+              target="_blank"
+              >
+              RSS
+            </a>
+          </li>
+        
+          <li class="item-toolbox">
+            <a
+              class="CIRCLE"
+              href="/search/"
+              rel="noopener noreferrer"
+              target="_self"
+              >
+              搜索
+            </a>
+          </li>
+        
+      </ul>
+
+    </div>
+  </div>
+</div>
+
+
+
+  
+      <div class="fexo-comments comments-post">
+    
+
+    
+
+    
+    
+
+    
+
+    
+    
+
+  </div>
+
+  
+
+  <script type="text/javascript">
+  function loadScript(url, callback) {
+    var script = document.createElement('script')
+    script.type = 'text/javascript';
+
+    if (script.readyState) { //IE
+      script.onreadystatechange = function() {
+        if (script.readyState == 'loaded' ||
+          script.readyState == 'complete') {
+          script.onreadystatechange = null;
+          callback();
+        }
+      };
+    } else { //Others
+      script.onload = function() {
+        callback();
+      };
+    }
+
+    script.src = url;
+    document.getElementsByTagName('head')[0].appendChild(script);
+  }
+
+  window.onload = function() {
+    loadScript('/js/bundle.js?235683', function() {
+      // load success
+    });
+  }
+</script>
+
+</body>
+</html>
